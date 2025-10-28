@@ -14,10 +14,10 @@ export async function GET(req: NextRequest) {
       if (v === 'true' || v === 'false') return v;
       return undefined;
     })(),
+    location: searchParams.get('location') ?? undefined,
     sort: searchParams.get('sort') ?? undefined,
     offset: Number(searchParams.get('offset') ?? '0') || 0,
     limit: Math.min(Number(searchParams.get('limit') ?? '20') || 20, 100),
   });
   return Response.json(res);
 }
-

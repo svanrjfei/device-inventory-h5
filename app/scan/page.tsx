@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { devicesApi } from "@/lib/api";
+import { toast } from "sonner";
 import { BrowserMultiFormatReader, DecodeHintType, NotFoundException, BarcodeFormat } from "@zxing/library";
 // 支持二维码与常见一维码（条形码）
 const SUPPORTED_FORMATS = [
@@ -68,9 +69,11 @@ export default function ScanPage() {
         router.push(`/search/results?q=${encodeURIComponent(code)}`);
       } else {
         setMsg("未找到相关设备，可尝试前往查询页");
+        toast.error("未找到相关设备");
       }
     } catch (e: any) {
       setMsg(e?.message || '查询失败');
+      toast.error("查询失败");
     }
   }
 

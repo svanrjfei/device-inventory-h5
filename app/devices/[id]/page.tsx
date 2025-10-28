@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/header";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, BadgeInfo, MapPin, User, Calendar, DollarSign, Tag } from "lucide-react";
+import { toast } from "sonner";
 
 export default function DeviceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -16,13 +17,21 @@ export default function DeviceDetailPage() {
 
   useEffect(() => {
     setMounted(true);
-    devicesApi.get(id).then(setD).catch(() => setD(null));
+    devicesApi
+      .get(id)
+      .then((res) => {
+        setD(res);
+      })
+      .catch(() => {
+        setD(null);
+        toast.error("加载失败");
+      });
   }, [id]);
 
   if (!mounted)
     return (
       <div className="mx-auto max-w-xl px-0">
-        <PageHeader title="设备信息" back />
+        <PageHeader title="设备信息" backHref="/ledger" />
         <div className="mx-4 text-sm text-neutral-400">加载中…</div>
         <div className="pb-28" />
       </div>
@@ -31,20 +40,30 @@ export default function DeviceDetailPage() {
   if (!d)
     return (
       <div className="mx-auto max-w-xl px-0">
-        <PageHeader title="设备信息" back />
+        <PageHeader title="设备信息" backHref="/ledger" />
         <div className="mx-4 text-sm text-gray-600">未找到设备</div>
       </div>
     );
 
   function toggleMissing() {
-    devicesApi.patch(d.id, { missing: !d.missing }).then(setD).catch(() => {});
+    toast.promise(
+      devicesApi.patch(d.id, { missing: !d.missing }).then((res) => {
+        setD(res);
+        return res;
+      }),
+      {
+        loading: d.missing ? "设置为非缺失…" : "设置为缺失…",
+        success: d.missing ? "已设为非缺失" : "已设为缺失",
+        error: "更新失败",
+      }
+    );
   }
 
   return (
     <div className="mx-auto max-w-xl px-0">
       <PageHeader
         title={d.name}
-        back
+        backHref="/ledger"
         subtitle={<span className="text-xs">编码 {d.code}</span>}
         actions={
           <>

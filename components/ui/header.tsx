@@ -7,21 +7,22 @@ import React from "react";
 type HeaderProps = {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
-  back?: boolean;
+  back?: boolean; // deprecated: prefer backHref
+  backHref?: string; // navigate to this path instead of history.back
   className?: string;
   actions?: React.ReactNode;
 };
 
-export function PageHeader({ title, subtitle, back, className, actions }: HeaderProps) {
+export function PageHeader({ title, subtitle, back, backHref, className, actions }: HeaderProps) {
   const router = useRouter();
   return (
     <div className={cn("px-4 pt-6 pb-3", className)}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
-          {back && (
+          {(back || backHref) && (
             <button
               aria-label="返回"
-              onClick={() => router.back()}
+              onClick={() => router.push(backHref ?? "/")}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-neutral-50"
             >
               <ArrowLeft size={18} />
@@ -39,4 +40,3 @@ export function PageHeader({ title, subtitle, back, className, actions }: Header
     </div>
   );
 }
-

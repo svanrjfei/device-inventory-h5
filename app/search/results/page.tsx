@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, MapPin, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 function DeviceCard({ d, onToggle, onRestore, onMarkMissing }: { d: DeviceDTO; onToggle?: (id:number)=>void; onRestore: (dev: DeviceDTO) => void; onMarkMissing: (id:number)=>void }) {
   return (
@@ -71,13 +72,23 @@ export default function ResultsPage() {
     if (!mounted) return;
     devicesApi
       .list({ search: q, sort: 'updatedAt:desc', offset: 0, limit: 50 })
-      .then((res) => setList(res.items))
-      .catch(() => setList([]));
+      .then((res) => {
+        setList(res.items);
+      })
+      .catch(() => {
+        setList([]);
+        toast.error("加载失败");
+      });
   }, [mounted, q]);
 
   async function toggleMissing(id: number) {
-    const updated = await devicesApi.patch(id, { missing: true });
-    setList((prev) => prev.map((d) => (d.id === id ? updated : d)));
+    toast.promise(
+      devicesApi.patch(id, { missing: true }).then((updated) => {
+        setList((prev) => prev.map((d) => (d.id === id ? updated : d)));
+        return updated;
+      }),
+      { loading: "更新中…", success: "已设为缺失", error: "更新失败" }
+    );
   }
 
   function openRestore(dev: DeviceDTO) {
@@ -88,17 +99,22 @@ export default function ResultsPage() {
 
   async function submitRestore() {
     if (!restoreDevice) return;
-    const updated = await devicesApi.patch(restoreDevice.id, { missing: false, location: restoreLocation || null });
-    setList((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-    setRestoreOpen(false);
-    setRestoreDevice(null);
+    toast.promise(
+      devicesApi.patch(restoreDevice.id, { missing: false, location: restoreLocation || null }).then((updated) => {
+        setList((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+        setRestoreOpen(false);
+        setRestoreDevice(null);
+        return updated;
+      }),
+      { loading: "更新中…", success: "已设为非缺失", error: "更新失败" }
+    );
   }
 
   const title = useMemo(() => (q ? `查询结果（关键字：${q}）` : '查询结果'), [q]);
 
   return (
     <div className="mx-auto max-w-xl px-0">
-      <PageHeader title={title} back />
+      <PageHeader title={title} backHref="/search" />
       <div className="mx-4 space-y-3 pb-24">
         {!mounted ? (
           <div className="text-sm text-neutral-400">加载中…</div>

@@ -23,5 +23,10 @@ export const devicesApi = {
       body: JSON.stringify(body),
     });
   },
+  locations(params: Record<string, any>) {
+    const sp = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null) sp.set(k, String(v));
+    const qs = sp.toString();
+    return json<{ items: string[]; total: number; hasNull: boolean }>(`/api/devices/locations${qs ? `?${qs}` : ''}`);
+  },
 };
-

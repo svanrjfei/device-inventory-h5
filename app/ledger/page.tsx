@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, MapPin, User, RefreshCw, SortAsc, SortDesc, SlidersHorizontal, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
 
 type SortKey = "updatedAt" | "name" | "status" | "missing";
 
@@ -20,7 +22,6 @@ export default function LedgerPage() {
   const [locationFilter, setLocationFilter] = useState<string>('ALL');
   const [missingFilter, setMissingFilter] = useState<'all'|'missing'|'not'>('all');
   const [page, setPage] = useState(1);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -37,6 +38,11 @@ export default function LedgerPage() {
   const [draftAsc, setDraftAsc] = useState(false);
   const [draftLocation, setDraftLocation] = useState<string>('ALL');
   const [draftMissing, setDraftMissing] = useState<'all'|'missing'|'not'>('all');
+  // 位置选项（从数据库分页获取）
+  const [locItems, setLocItems] = useState<string[]>([]);
+  const [locTotal, setLocTotal] = useState(0);
+  const [locHasNull, setLocHasNull] = useState(false);
+  const [locLoading, setLocLoading] = useState(false);
 
   // pull-to-refresh states
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -44,6 +50,10 @@ export default function LedgerPage() {
   const startScrollTop = useRef(0);
   const [pull, setPull] = useState(0); // pixels
   const PULL_THRESHOLD = 60;
+  const loadingRef = useRef(false);
+  const lastKeyRef = useRef<string>("");
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const locations = useMemo(() => {
     const set = new Set<string>();
@@ -79,37 +89,42 @@ export default function LedgerPage() {
     return arr;
   }, [filtered, sort, asc]);
 
-  const displayed = useMemo(() => {
-    return sorted.slice(0, page * PAGE_SIZE);
-  }, [sorted, page]);
-
-  const canLoadMore = displayed.length < sorted.length;
+  // 直接展示服务端返回的集合
+  const displayed = sorted;
 
   const reload = useCallback(async () => {
+    const key = `${sort}|${asc}|${missingFilter}|${locationFilter}|${page}`;
+    if (loadingRef.current) return;
+    if (lastKeyRef.current === key) return;
+    lastKeyRef.current = key;
+    loadingRef.current = true;
     setRefreshing(true);
-    const params: any = { sort: (sort + ':' + (asc ? 'asc' : 'desc')), offset: 0, limit: PAGE_SIZE };
+    const params: any = { sort: (sort + ':' + (asc ? 'asc' : 'desc')), offset: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE };
     if (missingFilter !== 'all') params.missing = String(missingFilter === 'missing');
-    const { items, total } = await devicesApi.list(params);
-    setSource(items);
-    setTotal(total);
-    setPage(1);
-    setRefreshing(false);
-  }, [sort, asc, missingFilter]);
+    if (locationFilter && locationFilter !== 'ALL') params.location = locationFilter;
+    try {
+      const { items, total } = await devicesApi.list(params);
+      setSource(items);
+      setTotal(total);
+      setRefreshing(false);
+    } catch (e) {
+      setRefreshing(false);
+      toast.error("加载失败");
+    } finally {
+      loadingRef.current = false;
+    }
+  }, [sort, asc, missingFilter, locationFilter, page]);
 
-  const loadMore = useCallback(async () => {
-    if (!canLoadMore || loadingMore) return;
-    setLoadingMore(true);
-    const params: any = { sort: (sort + ':' + (asc ? 'asc' : 'desc')), offset: source.length, limit: PAGE_SIZE };
-    if (missingFilter !== 'all') params.missing = String(missingFilter === 'missing');
-    const { items } = await devicesApi.list(params);
-    setSource((prev) => [...prev, ...items]);
-    setPage((p) => p + 1);
-    setLoadingMore(false);
-  }, [canLoadMore, loadingMore, source.length, sort, asc, missingFilter]);
+  // 移除 loadMore（使用分页）
 
   async function toggleMissing(id: number) {
-    const updated = await devicesApi.patch(id, { missing: true });
-    setSource((prev) => prev.map((d) => (d.id === id ? updated : d)));
+    toast.promise(
+      devicesApi.patch(id, { missing: true }).then((updated) => {
+        setSource((prev) => prev.map((d) => (d.id === id ? updated : d)));
+        return updated;
+      }),
+      { loading: "更新中…", success: "已设为缺失", error: "更新失败" }
+    );
   }
 
   function openRestore(dev: DeviceDTO) {
@@ -120,19 +135,19 @@ export default function LedgerPage() {
 
   async function submitRestore() {
     if (!restoreDevice) return;
-    const updated = await devicesApi.patch(restoreDevice.id, { missing: false, location: restoreLocation || null });
-    setSource((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-    setRestoreOpen(false);
-    setRestoreDevice(null);
+    toast.promise(
+      devicesApi.patch(restoreDevice.id, { missing: false, location: restoreLocation || null }).then((updated) => {
+        setSource((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+        setRestoreOpen(false);
+        setRestoreDevice(null);
+        return updated;
+      }),
+      { loading: "更新中…", success: "已设为非缺失", error: "更新失败" }
+    );
   }
 
-  // Infinite scroll handler
-  function onScroll(e: React.UIEvent<HTMLDivElement>) {
-    const el = e.currentTarget;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80) {
-      loadMore();
-    }
-  }
+  // 不再使用下滑加载
+  function onScroll(_e: React.UIEvent<HTMLDivElement>) {}
 
   // Pull to refresh handlers
   function onTouchStart(e: React.TouchEvent<HTMLDivElement>) {
@@ -168,12 +183,25 @@ export default function LedgerPage() {
       setDraftAsc(asc);
       setDraftLocation(locationFilter);
       setDraftMissing(missingFilter);
+      // 初次打开时加载位置选项
+      if (locItems.length === 0 && !locLoading) {
+        (async () => {
+          setLocLoading(true);
+          const { items, total, hasNull } = await devicesApi.locations({ offset: 0, limit: 30 });
+          setLocItems(items);
+          setLocTotal(total);
+          setLocHasNull(hasNull);
+          setLocLoading(false);
+        })();
+      }
     }
   }, [drawerOpen]);
 
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // 移除 IntersectionObserver 逻辑（统一使用分页）
 
   return (
     <div className="mx-auto max-w-xl px-0 min-h-[100dvh] flex flex-col">
@@ -195,11 +223,11 @@ export default function LedgerPage() {
 
       {/* 顶部抽屉：仅在客户端且打开时渲染，避免 SSR/CSR 数据不一致导致的 hydration 报错 */}
       {mounted && drawerOpen && (
-        <div className={cn('fixed inset-x-0 top-0 z-40')}>
-          {/* 遮罩层 */}
-          <div className='fixed inset-0 bg-black/30' onClick={() => setDrawerOpen(false)} />
-          {/* 抽屉面板 */}
-          <div className='mx-auto max-w-xl rounded-b-2xl border-b bg-white shadow-lg'>
+        <div className={cn('fixed inset-x-0 top-0 z-50')}>
+          {/* 遮罩层（位于面板之下） */}
+          <div className='fixed inset-0 bg-black/30 z-40' onClick={() => setDrawerOpen(false)} />
+          {/* 抽屉面板（确保在遮罩之上） */}
+          <div className='relative z-50 mx-auto max-w-xl rounded-b-2xl border-b bg-white shadow-lg'>
             <div className="flex items-center justify-between px-4 py-3 border-b">
               <div className="font-medium">排序与筛选</div>
               <button className="rounded-md p-1 hover:bg-neutral-100" onClick={() => setDrawerOpen(false)} aria-label="关闭">
@@ -226,21 +254,33 @@ export default function LedgerPage() {
               </div>
 
               {/* 位置筛选 */}
-              <div className="flex items-center gap-3">
-                <span className="w-16 text-right text-xs text-neutral-600">存放位置</span>
-                <select
-                  value={draftLocation}
-                  onChange={(e) => setDraftLocation(e.target.value)}
-                  className="h-9 w-56 rounded-md border bg-white px-2 text-sm"
-                >
-                  <option value="ALL">全部</option>
-                  {locations.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc === '__NULL__' ? '未知' : loc}
-                    </option>
+            <div className="flex items-center gap-3">
+              <span className="w-16 text-right text-xs text-neutral-600">存放位置</span>
+              <Select value={draftLocation} onValueChange={setDraftLocation}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="选择位置" />
+                </SelectTrigger>
+                <SelectContent onViewportScroll={async (e) => {
+                  const el = e.currentTarget as HTMLDivElement;
+                  const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+                  const loaded = locItems.length;
+                  if (nearBottom && !locLoading && loaded < locTotal) {
+                    setLocLoading(true);
+                    const { items } = await devicesApi.locations({ offset: loaded, limit: 30 });
+                    setLocItems((prev) => [...prev, ...items.filter((it) => !prev.includes(it))]);
+                    setLocLoading(false);
+                  }
+                }}>
+                  <SelectItem value="ALL">全部</SelectItem>
+                  {locHasNull && <SelectItem value="__NULL__">未知</SelectItem>}
+                  {locItems.map((loc) => (
+                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
                   ))}
-                </select>
-              </div>
+                  {locLoading && <div className="px-2 py-1 text-xs text-neutral-500">加载中…</div>}
+                  {locItems.length >= locTotal && <div className="px-2 py-1 text-xs text-neutral-400">没有更多了</div>}
+                </SelectContent>
+              </Select>
+            </div>
 
               {/* 缺失筛选 */}
               <div className="flex items-center gap-3">
@@ -307,12 +347,6 @@ export default function LedgerPage() {
                 onMarkMissing={(id) => toggleMissing(id)}
               />
             ))}
-            {loadingMore && (
-              <div className="py-4 text-center text-xs text-neutral-500">加载中…</div>
-            )}
-            {!canLoadMore && (
-              <div className="py-4 text-center text-xs text-neutral-400">没有更多了</div>
-            )}
           </div>
         </div>
       ) : (
@@ -344,6 +378,29 @@ export default function LedgerPage() {
           </div>
         </div>
       )}
+
+      {/* 底部分页浮层（位于 TabBar 之上） */}
+      <div className="fixed left-0 right-0 z-40" style={{ bottom: '72px' }}>
+        <div className="mx-auto max-w-xl px-4">
+          <div className="rounded-full border bg-white/95 backdrop-blur shadow px-3 py-2 flex items-center justify-between text-xs text-neutral-700">
+            <span>共 {total} 条 · 第 {page} / {pageCount} 页</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >上一页</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= pageCount}
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              >下一页</Button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

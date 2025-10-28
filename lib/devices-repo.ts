@@ -5,7 +5,8 @@ import type { DeviceDTO } from './types';
 import { and, desc, eq, like, or, sql } from 'drizzle-orm';
 
 export async function getDeviceById(id: number): Promise<DeviceDTO | null> {
-  const rows = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
+  if (!Number.isFinite(id)) return null;
+  const rows = await db.select().from(devices).where(eq(devices.id, Number(id))).limit(1);
   if (!rows.length) return null;
   return rowToDTO(rows[0]);
 }
@@ -15,6 +16,7 @@ type ListParams = {
   code?: string;
   status?: string;
   missing?: 'true' | 'false';
+  location?: string; // exact match; '__NULL__' means IS NULL
   sort?: string; // updatedAt:desc etc
   offset?: number;
   limit?: number;
@@ -26,6 +28,7 @@ export async function listDevices(params: ListParams) {
     code,
     status,
     missing,
+    location,
     sort = 'updatedAt:desc',
     offset = 0,
     limit = 20,
@@ -49,6 +52,14 @@ export async function listDevices(params: ListParams) {
         like(devices.code, q)
       )
     );
+  }
+
+  if (location && location !== 'ALL') {
+    if (location === '__NULL__') {
+      whereClauses.push(sql`(${devices.location} IS NULL)`);
+    } else {
+      whereClauses.push(eq(devices.location, location));
+    }
   }
 
   const order = (() => {
@@ -112,3 +123,38 @@ export async function patchDevice(id: number, body: Partial<DeviceDTO>): Promise
   return await getDeviceById(id);
 }
 
+export async function distinctLocations(params: { search?: string; offset?: number; limit?: number }) {
+  const { search, offset = 0, limit = 30 } = params;
+
+  const whereClauses: any[] = [];
+  if (search) {
+    const q = `%${search}%`;
+    whereClauses.push(like(devices.location, q));
+  }
+
+  // total distinct locations (excluding NULL)
+  const totalRows = await db
+    .select({ count: sql<number>`COUNT(DISTINCT ${devices.location})`.mapWith(Number) })
+    .from(devices)
+    .where(whereClauses.length ? and(...whereClauses) : undefined);
+
+  const rows = await db
+    .select({ location: devices.location })
+    .from(devices)
+    .where(whereClauses.length ? and(...whereClauses) : undefined)
+    .groupBy(devices.location)
+    .orderBy(devices.location)
+    .limit(limit)
+    .offset(offset);
+
+  const nullRows = await db
+    .select({ c: sql<number>`COUNT(*)`.mapWith(Number) })
+    .from(devices)
+    .where(sql`(${devices.location} IS NULL)`);
+
+  return {
+    items: rows.map((r) => r.location).filter((v): v is string => v != null),
+    total: totalRows[0]?.count ?? 0,
+    hasNull: (nullRows[0]?.c ?? 0) > 0,
+  };
+}

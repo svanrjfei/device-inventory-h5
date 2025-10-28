@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function DeviceEditPage() {
   const params = useParams<{ id: string }>();
@@ -20,7 +21,7 @@ export default function DeviceEditPage() {
   if (!form)
     return (
       <div className="mx-auto max-w-xl px-0">
-        <PageHeader title="编辑设备信息" back />
+        <PageHeader title="编辑设备信息" backHref="/ledger" />
         <div className="mx-4 text-sm text-gray-600">未找到设备</div>
       </div>
     );
@@ -50,12 +51,21 @@ export default function DeviceEditPage() {
       funding: form.funding,
       note: form.note,
     };
-    devicesApi.patch(form.id, patch).then(() => router.push(`/devices/${form.id}`));
+    toast.promise(
+      devicesApi.patch(form.id, patch).then(() => {
+        router.push(`/devices/${form.id}`);
+      }),
+      {
+        loading: "保存中…",
+        success: "保存成功",
+        error: "保存失败",
+      }
+    );
   }
 
   return (
     <div className="mx-auto max-w-xl px-0">
-      <PageHeader title="编辑设备信息" back subtitle={<span className="text-xs">{form.name} · {form.code}</span>} />
+      <PageHeader title="编辑设备信息" backHref={`/devices/${form.id}`} subtitle={<span className="text-xs">{form.name} · {form.code}</span>} />
       <div className="mx-4 space-y-4">
         {/* 基础信息 */}
         <Card>
@@ -149,7 +159,7 @@ export default function DeviceEditPage() {
         </Card>
 
         <div className="flex justify-end gap-3">
-          <Button variant="outline" size="sm" onClick={() => router.back()}>取消</Button>
+          <Button variant="outline" size="sm" onClick={() => router.push(`/devices/${form.id}`)}>取消</Button>
           <Button size="sm" onClick={save}>保存</Button>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Toaster } from "sonner";
 import { TabBar } from "@/components/tab-bar";
 
 const geistSans = Geist({
@@ -33,6 +34,7 @@ export default function RootLayout({
         <div className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75">
           <TabBar />
         </div>
+        <Toaster position="top-center" richColors closeButton toastOptions={{ duration: 1500 }} />
       </body>
     </html>
   );
