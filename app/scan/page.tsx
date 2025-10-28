@@ -4,13 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import { devicesApi } from "@/lib/api";
 import { toast } from "sonner";
 import { BrowserMultiFormatReader, DecodeHintType, NotFoundException, BarcodeFormat } from "@zxing/library";
-// 支持二维码与常见一维码（条形码）
-const SUPPORTED_FORMATS = [
+import { PageHeader } from "@/components/ui/header";
+
+type ScanMode = "auto" | "1d" | "2d";
+
+const FORMATS_2D = [
   BarcodeFormat.QR_CODE,
   BarcodeFormat.AZTEC,
   BarcodeFormat.DATA_MATRIX,
   BarcodeFormat.PDF_417,
-  // 一维码（条形码）
+];
+const FORMATS_1D = [
   BarcodeFormat.EAN_13,
   BarcodeFormat.EAN_8,
   BarcodeFormat.UPC_A,
@@ -22,13 +26,20 @@ const SUPPORTED_FORMATS = [
   BarcodeFormat.CODABAR,
 ];
 
-function buildHints() {
+function getFormats(mode: ScanMode) {
+  if (mode === "1d") return FORMATS_1D;
+  if (mode === "2d") return FORMATS_2D;
+  return [...FORMATS_2D, ...FORMATS_1D];
+}
+
+function buildHints(mode: ScanMode) {
   const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, SUPPORTED_FORMATS);
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, getFormats(mode));
   hints.set(DecodeHintType.TRY_HARDER, true);
+  try { hints.set(((DecodeHintType as any).ALSO_INVERTED as any), true as any); } catch {}
+  try { hints.set(((DecodeHintType as any).ASSUME_GS1 as any), true as any); } catch {}
   return hints;
 }
-import { PageHeader } from "@/components/ui/header";
 
 export default function ScanPage() {
   const router = useRouter();
@@ -37,6 +48,9 @@ export default function ScanPage() {
   const [active, setActive] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [mode, setMode] = useState<ScanMode>("auto");
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -68,11 +82,11 @@ export default function ScanPage() {
       } else if (fuzzy.items.length > 1) {
         router.push(`/search/results?q=${encodeURIComponent(code)}`);
       } else {
-        setMsg("未找到相关设备，可尝试前往查询页");
+        setMsg("未找到相关设备，可前往查询页试试");
         toast.error("未找到相关设备");
       }
     } catch (e: any) {
-      setMsg(e?.message || '查询失败');
+      setMsg(e?.message || "查询失败");
       toast.error("查询失败");
     }
   }
@@ -84,49 +98,72 @@ export default function ScanPage() {
     const video = videoRef.current;
     if (!video) return;
 
-    // Feature detection: require secure context + mediaDevices API
-    const hasMedia = typeof navigator !== 'undefined' && !!navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function';
-    const isSecure = typeof window !== 'undefined' && (window.isSecureContext || location.hostname === 'localhost');
+    const hasMedia = typeof navigator !== "undefined" && !!navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === "function";
+    const isSecure = typeof window !== "undefined" && (window.isSecureContext || location.hostname === "localhost");
     if (!hasMedia || !isSecure) {
-      setPermissionError('当前环境不支持摄像头访问，请在 HTTPS 或 localhost 中打开，或使用下方“相册识别”。');
+      setPermissionError("当前环境不支持摄像头访问，请在 HTTPS 或 localhost 打开，或使用下方相册识别。");
       return;
     }
 
-    const reader = new BrowserMultiFormatReader(buildHints(), 200);
+    const reader = new BrowserMultiFormatReader(buildHints(mode), 300);
     readerRef.current = reader;
 
     try {
-      await reader.decodeFromConstraints(
-        {
-          video: {
-            facingMode: { ideal: "environment" },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        },
-        video,
-        (result, err) => {
-          if (result) {
-            onDetected(result.getText());
-          } else if (err && !(err instanceof NotFoundException)) {
-            setMsg(String(err));
-          }
+      const constraintsList: MediaStreamConstraints[] = [
+        { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+        { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode: { ideal: "environment" }, width: { ideal: 960 }, height: { ideal: 540 } }, audio: false },
+        { video: { facingMode: { ideal: "environment" } }, audio: false },
+      ];
+
+      let started = false;
+      for (const cs of constraintsList) {
+        try {
+          await reader.decodeFromConstraints(
+            cs,
+            video,
+            (result, err) => {
+              if (result) {
+                onDetected(result.getText());
+              } else if (err && !(err instanceof NotFoundException)) {
+                setMsg(String(err));
+              }
+            }
+          );
+          started = true;
+          break;
+        } catch {
+          try { reader.reset(); } catch {}
         }
-      );
+      }
+      if (!started) throw new Error("无法启动摄像头");
       setActive(true);
+
+      try {
+        const stream = (videoRef.current?.srcObject ?? null) as MediaStream | null;
+        const track = stream?.getVideoTracks?.()[0];
+        const caps: any = track?.getCapabilities?.();
+        const supportsTorch = !!caps?.torch;
+        setTorchSupported(supportsTorch);
+        if (supportsTorch && torchOn) {
+          await (track as any).applyConstraints({ advanced: [{ torch: true }] });
+        }
+      } catch {}
     } catch (e: any) {
-      setPermissionError(e?.message || "无法访问摄像头，请在浏览器中允许相机权限或使用查询页");
+      setPermissionError(e?.message || "无法访问摄像头，请检查权限或使用查询页");
       setActive(false);
     }
   }
 
   function stopScan() {
-    try {
-      readerRef.current?.stopContinuousDecode();
-    } catch {}
+    try { readerRef.current?.stopContinuousDecode(); } catch {}
     readerRef.current?.reset();
     readerRef.current = null;
+    try {
+      const stream = (videoRef.current?.srcObject ?? null) as MediaStream | null;
+      stream?.getTracks?.().forEach((t) => t.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    } catch {}
     setActive(false);
   }
 
@@ -134,9 +171,39 @@ export default function ScanPage() {
     <div className="mx-auto max-w-xl px-0">
       <PageHeader title="扫码" />
       <div className="mx-4 rounded-lg border bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-2 text-sm">
+          <label className="text-neutral-600">识别类型</label>
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as ScanMode)}
+            className="h-9 rounded-md border px-2"
+            disabled={active}
+          >
+            <option value="auto">自动</option>
+            <option value="1d">一维码</option>
+            <option value="2d">二维码</option>
+          </select>
+          {torchSupported && (
+            <button
+              onClick={async () => {
+                const next = !torchOn;
+                setTorchOn(next);
+                try {
+                  const stream = (videoRef.current?.srcObject ?? null) as MediaStream | null;
+                  const track = stream?.getVideoTracks?.()[0];
+                  if (track && (track as any).applyConstraints) {
+                    await (track as any).applyConstraints({ advanced: [{ torch: next }] });
+                  }
+                } catch {}
+              }}
+              className="ml-auto rounded-md border px-3 py-1.5 hover:bg-gray-50"
+            >
+              {torchOn ? "关闭闪光灯" : "开启闪光灯"}
+            </button>
+          )}
+        </div>
         <div className="relative w-full overflow-hidden rounded-md border bg-black">
           <video ref={videoRef} className="block w-full h-[320px] object-cover" muted playsInline />
-          {/* overlay */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-40 w-40 border-2 border-emerald-400/90 shadow-[0_0_30px_rgba(16,185,129,0.4)]"></div>
           </div>
@@ -152,7 +219,7 @@ export default function ScanPage() {
         <AlbumFallback onDetected={onDetected} />
         {permissionError && <p className="mt-3 text-sm text-amber-600">{permissionError}</p>}
         {msg && <p className="mt-2 text-sm text-amber-600">{msg}</p>}
-        <p className="mt-3 text-xs text-gray-500">在 HTTPS 或 localhost 环境下授权相机权限，优先使用后置摄像头。</p>
+        <p className="mt-3 text-xs text-gray-500">注意：需在 HTTPS 或 localhost 环境并授予摄像头权限。</p>
       </div>
       <div className="pb-24" />
     </div>
@@ -171,15 +238,15 @@ function AlbumFallback({ onDetected }: { onDetected: (text: string) => void }) {
     setError(null);
     const url = URL.createObjectURL(file);
     try {
-      const reader = new BrowserMultiFormatReader(buildHints());
+      const reader = new BrowserMultiFormatReader(buildHints("auto"));
       const result = await reader.decodeFromImageUrl(url);
       if (result?.getText) onDetected(result.getText());
     } catch (err: any) {
-      setError(err?.message || '识别失败，请重试或更换更清晰图片');
+      setError(err?.message || "识别失败，可尝试更清晰/更大条码图片");
     } finally {
       URL.revokeObjectURL(url);
       setBusy(false);
-      if (inputRef.current) inputRef.current.value = '';
+      if (inputRef.current) inputRef.current.value = "";
     }
   }
 
@@ -197,7 +264,8 @@ function AlbumFallback({ onDetected }: { onDetected: (text: string) => void }) {
         {busy && <span className="text-xs text-gray-500">识别中…</span>}
       </div>
       {error && <p className="mt-2 text-xs text-amber-600">{error}</p>}
-      <p className="mt-2 text-xs text-gray-500">相册识别：拍照/选取包含设备码的图片进行识别。</p>
+      <p className="mt-2 text-xs text-gray-500">也可拍照/选择包含设备码的图片进行识别</p>
     </div>
   );
 }
+
