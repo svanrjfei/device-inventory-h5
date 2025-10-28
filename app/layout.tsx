@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { TabBar } from "@/components/tab-bar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,10 +25,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+      <body suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 text-gray-900`}>
+        <div className="min-h-screen pb-20">
+          {children}
+        </div>
+        {/* Bottom TabBar */}
+        <div className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/75">
+          <TabBar />
+        </div>
       </body>
     </html>
   );
