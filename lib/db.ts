@@ -15,8 +15,20 @@ const globalForDb = globalThis as unknown as GlobalDb;
 
 function makePool(url: string) {
   const u = new URL(url);
-  const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(u.hostname);
-  const shouldSSL = process.env.MYSQL_SSL === '1' || !isLocalHost || u.searchParams.get('ssl') === 'true';
+  // SSL decision order:
+  // 1) Respect explicit MYSQL_SSL env ("1/true" to enable, "0/false" to disable)
+  // 2) Respect explicit ssl URL param (ssl=true/false)
+  // 3) Default: no SSL to avoid HANDSHAKE_NO_SSL_SUPPORT on servers without TLS
+  const envSsl = (process.env.MYSQL_SSL || '').toLowerCase();
+  let shouldSSL: boolean;
+  if (envSsl === '1' || envSsl === 'true') shouldSSL = true;
+  else if (envSsl === '0' || envSsl === 'false') shouldSSL = false;
+  else {
+    const sslParam = (u.searchParams.get('ssl') || '').toLowerCase();
+    if (sslParam === '1' || sslParam === 'true') shouldSSL = true;
+    else if (sslParam === '0' || sslParam === 'false') shouldSSL = false;
+    else shouldSSL = false;
+  }
 
   const options: mysql.PoolOptions = {
     host: u.hostname,
@@ -51,4 +63,3 @@ if (!globalForDb.__mysqlPool) globalForDb.__mysqlPool = pool;
 if (!globalForDb.__drizzleDb) globalForDb.__drizzleDb = db;
 
 export type DbType = typeof db;
-
