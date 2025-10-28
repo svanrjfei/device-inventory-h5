@@ -36,7 +36,7 @@ export default function ScanPage() {
   const [active, setActive] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-  const [mode, setMode] = useState<ScanMode>("2d");
+  const [mode, setMode] = useState<ScanMode>("auto");
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
 
@@ -57,7 +57,7 @@ export default function ScanPage() {
     try {
       const res = await devicesApi.list({ code, limit: 20 });
       if (res.items.length === 1) {
-        router.push(`/devices/${res.items[0].id}`);
+        router.push(`/devices/${res.items[0].id}?src=scan`);
         return;
       }
       if (res.items.length > 1) {
@@ -66,7 +66,7 @@ export default function ScanPage() {
       }
       const fuzzy = await devicesApi.list({ search: code, limit: 20 });
       if (fuzzy.items.length === 1) {
-        router.push(`/devices/${fuzzy.items[0].id}`);
+        router.push(`/devices/${fuzzy.items[0].id}?src=scan`);
       } else if (fuzzy.items.length > 1) {
         router.push(`/search/results?q=${encodeURIComponent(code)}`);
       } else {
@@ -271,3 +271,4 @@ function AlbumFallback({ onDetected }: { onDetected: (text: string) => void }) {
     </div>
   );
 }
+

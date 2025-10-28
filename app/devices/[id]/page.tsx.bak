@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useParams, useRouter } from "next/navigation";
 import { devicesApi } from "@/lib/api";
 import { formatMoney, formatDate } from "@/lib/format";
@@ -126,3 +126,4 @@ export default function DeviceDetailPage() {
     </div>
   );
 }
+
