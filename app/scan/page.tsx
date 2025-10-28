@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { mockApi } from "@/lib/mock-data";
+import { devicesApi } from "@/lib/api";
 import { BrowserMultiFormatReader, DecodeHintType, NotFoundException, BarcodeFormat } from "@zxing/library";
 // 支持二维码与常见一维码（条形码）
 const SUPPORTED_FORMATS = [
@@ -48,23 +48,29 @@ export default function ScanPage() {
     handleCode(text);
   }
 
-  function handleCode(raw: string) {
+  async function handleCode(raw: string) {
     const code = raw.trim();
     if (!code) return;
-    const exact = mockApi.search({ code });
-    if (exact.length === 1) {
-      router.push(`/devices/${exact[0].id}`);
-      return;
-    }
-    const fuzzy = mockApi.search({ search: code });
-    if (fuzzy.length === 0) {
-      setMsg("未找到相关设备，可尝试前往查询页");
-      return;
-    }
-    if (fuzzy.length === 1) {
-      router.push(`/devices/${fuzzy[0].id}`);
-    } else {
-      router.push(`/search/results?q=${encodeURIComponent(code)}`);
+    try {
+      const res = await devicesApi.list({ code, limit: 20 });
+      if (res.items.length === 1) {
+        router.push(`/devices/${res.items[0].id}`);
+        return;
+      }
+      if (res.items.length > 1) {
+        router.push(`/search/results?q=${encodeURIComponent(code)}`);
+        return;
+      }
+      const fuzzy = await devicesApi.list({ search: code, limit: 20 });
+      if (fuzzy.items.length === 1) {
+        router.push(`/devices/${fuzzy.items[0].id}`);
+      } else if (fuzzy.items.length > 1) {
+        router.push(`/search/results?q=${encodeURIComponent(code)}`);
+      } else {
+        setMsg("未找到相关设备，可尝试前往查询页");
+      }
+    } catch (e: any) {
+      setMsg(e?.message || '查询失败');
     }
   }
 

@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { mockApi, DeviceDTO } from "@/lib/mock-data";
+import type { DeviceDTO } from "@/lib/types";
+import { devicesApi } from "@/lib/api";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, MapPin, User, RefreshCw, SortAsc, SortDesc, SlidersHorizontal, X } from "lucide-react";
@@ -14,7 +15,8 @@ const PAGE_SIZE = 10;
 export default function LedgerPage() {
   const [sort, setSort] = useState<SortKey>("updatedAt");
   const [asc, setAsc] = useState(false);
-  const [source, setSource] = useState<DeviceDTO[]>(() => mockApi.all());
+  const [source, setSource] = useState<DeviceDTO[]>([]);
+  const [total, setTotal] = useState(0);
   const [locationFilter, setLocationFilter] = useState<string>('ALL');
   const [missingFilter, setMissingFilter] = useState<'all'|'missing'|'not'>('all');
   const [page, setPage] = useState(1);
@@ -85,25 +87,29 @@ export default function LedgerPage() {
 
   const reload = useCallback(async () => {
     setRefreshing(true);
-    // 模拟网络延迟
-    await new Promise((r) => setTimeout(r, 400));
-    setSource(mockApi.all());
+    const params: any = { sort: (sort + ':' + (asc ? 'asc' : 'desc')), offset: 0, limit: PAGE_SIZE };
+    if (missingFilter !== 'all') params.missing = String(missingFilter === 'missing');
+    const { items, total } = await devicesApi.list(params);
+    setSource(items);
+    setTotal(total);
     setPage(1);
     setRefreshing(false);
-  }, []);
+  }, [sort, asc, missingFilter]);
 
   const loadMore = useCallback(async () => {
     if (!canLoadMore || loadingMore) return;
     setLoadingMore(true);
-    await new Promise((r) => setTimeout(r, 300));
+    const params: any = { sort: (sort + ':' + (asc ? 'asc' : 'desc')), offset: source.length, limit: PAGE_SIZE };
+    if (missingFilter !== 'all') params.missing = String(missingFilter === 'missing');
+    const { items } = await devicesApi.list(params);
+    setSource((prev) => [...prev, ...items]);
     setPage((p) => p + 1);
     setLoadingMore(false);
-  }, [canLoadMore, loadingMore]);
+  }, [canLoadMore, loadingMore, source.length, sort, asc, missingFilter]);
 
-  function toggleMissing(id: number) {
-    const next = mockApi.toggleMissing(id);
-    if (!next) return;
-    setSource((prev) => prev.map((d) => (d.id === id ? next : d)));
+  async function toggleMissing(id: number) {
+    const updated = await devicesApi.patch(id, { missing: true });
+    setSource((prev) => prev.map((d) => (d.id === id ? updated : d)));
   }
 
   function openRestore(dev: DeviceDTO) {
@@ -112,15 +118,10 @@ export default function LedgerPage() {
     setRestoreOpen(true);
   }
 
-  function submitRestore() {
+  async function submitRestore() {
     if (!restoreDevice) return;
-    const updated = mockApi.update(restoreDevice.id, {
-      missing: false,
-      location: restoreLocation || null,
-    });
-    if (updated) {
-      setSource((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-    }
+    const updated = await devicesApi.patch(restoreDevice.id, { missing: false, location: restoreLocation || null });
+    setSource((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
     setRestoreOpen(false);
     setRestoreDevice(null);
   }
@@ -169,6 +170,10 @@ export default function LedgerPage() {
       setDraftMissing(missingFilter);
     }
   }, [drawerOpen]);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   return (
     <div className="mx-auto max-w-xl px-0 min-h-[100dvh] flex flex-col">

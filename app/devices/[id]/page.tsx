@@ -1,6 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
-import { mockApi, formatMoney, formatDate } from "@/lib/mock-data";
+import { devicesApi } from "@/lib/api";
+import { formatMoney, formatDate } from "@/lib/format";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/header";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,12 @@ export default function DeviceDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = Number(params.id);
-  const [d, setD] = useState<ReturnType<typeof mockApi.getById> | null>(null);
+  const [d, setD] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setD(mockApi.getById(id) ?? null);
+    devicesApi.get(id).then(setD).catch(() => setD(null));
   }, [id]);
 
   if (!mounted)
@@ -36,8 +37,7 @@ export default function DeviceDetailPage() {
     );
 
   function toggleMissing() {
-    const next = mockApi.toggleMissing(d.id);
-    if (next) setD(next);
+    devicesApi.patch(d.id, { missing: !d.missing }).then(setD).catch(() => {});
   }
 
   return (

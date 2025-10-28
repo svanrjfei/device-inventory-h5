@@ -1,6 +1,7 @@
 "use client";
 import { useParams, useRouter } from "next/navigation";
-import { mockApi, DeviceDTO } from "@/lib/mock-data";
+import type { DeviceDTO } from "@/lib/types";
+import { devicesApi } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -10,11 +11,10 @@ export default function DeviceEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = Number(params.id);
-  const origin = mockApi.getById(id);
-  const [form, setForm] = useState<DeviceDTO | null>(origin ?? null);
+  const [form, setForm] = useState<DeviceDTO | null>(null);
 
   useEffect(() => {
-    setForm(mockApi.getById(id) ?? null);
+    devicesApi.get(id).then(setForm).catch(() => setForm(null));
   }, [id]);
 
   if (!form)
@@ -50,8 +50,7 @@ export default function DeviceEditPage() {
       funding: form.funding,
       note: form.note,
     };
-    mockApi.update(form.id, patch);
-    router.push(`/devices/${form.id}`);
+    devicesApi.patch(form.id, patch).then(() => router.push(`/devices/${form.id}`));
   }
 
   return (

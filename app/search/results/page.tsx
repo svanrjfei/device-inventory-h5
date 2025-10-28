@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { mockApi, DeviceDTO } from "@/lib/mock-data";
+import type { DeviceDTO } from "@/lib/types";
+import { devicesApi } from "@/lib/api";
 import { PageHeader } from "@/components/ui/header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,13 +68,16 @@ export default function ResultsPage() {
   }, []);
 
   useEffect(() => {
-    if (mounted) setList(mockApi.search({ search: q }));
+    if (!mounted) return;
+    devicesApi
+      .list({ search: q, sort: 'updatedAt:desc', offset: 0, limit: 50 })
+      .then((res) => setList(res.items))
+      .catch(() => setList([]));
   }, [mounted, q]);
 
-  function toggleMissing(id: number) {
-    const next = mockApi.toggleMissing(id);
-    if (!next) return;
-    setList((prev) => prev.map((d) => (d.id === id ? next : d)));
+  async function toggleMissing(id: number) {
+    const updated = await devicesApi.patch(id, { missing: true });
+    setList((prev) => prev.map((d) => (d.id === id ? updated : d)));
   }
 
   function openRestore(dev: DeviceDTO) {
@@ -82,15 +86,10 @@ export default function ResultsPage() {
     setRestoreOpen(true);
   }
 
-  function submitRestore() {
+  async function submitRestore() {
     if (!restoreDevice) return;
-    const updated = mockApi.update(restoreDevice.id, {
-      missing: false,
-      location: restoreLocation || null,
-    });
-    if (updated) {
-      setList((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-    }
+    const updated = await devicesApi.patch(restoreDevice.id, { missing: false, location: restoreLocation || null });
+    setList((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
     setRestoreOpen(false);
     setRestoreDevice(null);
   }
