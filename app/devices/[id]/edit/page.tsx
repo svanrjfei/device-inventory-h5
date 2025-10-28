@@ -31,6 +31,7 @@ export default function DeviceEditPage() {
   }
 
   function save() {
+    if (!form) return;
     const patch: Partial<DeviceDTO> = {
       name: form.name,
       model: form.model,

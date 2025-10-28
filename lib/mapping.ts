@@ -45,9 +45,8 @@ export function rowToDTO(row: DeviceRow): DeviceDTO {
     funding: row.funding ?? null,
     note: row.note ?? null,
     status: row.status ?? '在用',
-    missing: (row.missing ?? 0) === 1 || row.missing === true,
+    missing: Boolean((row as any).missing),
     createdAt: toISO(row.createdAt),
     updatedAt: toISO(row.updatedAt),
   };
 }
-

@@ -4,7 +4,7 @@ import { getDeviceById, patchDevice } from '@/lib/devices-repo';
 export const dynamic = 'force-dynamic';
 
 // In Next 16, params can be a Promise in dynamic APIs.
-export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, ctx: any) {
   const { id: idStr } = await ctx.params;
   const id = Number.parseInt(idStr, 10);
   if (!Number.isFinite(id)) {
@@ -15,7 +15,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
   return Response.json(dev);
 }
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, ctx: any) {
   const { id: idStr } = await ctx.params;
   const id = Number.parseInt(idStr, 10);
   if (!Number.isFinite(id)) {

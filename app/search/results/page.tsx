@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+export const dynamic = "force-dynamic";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import type { DeviceDTO } from "@/lib/types";
 import { devicesApi } from "@/lib/api";
@@ -54,7 +55,7 @@ function DeviceCard({ d, onToggle, onRestore, onMarkMissing }: { d: DeviceDTO; o
   );
 }
 
-export default function ResultsPage() {
+function ResultsContent() {
   const params = useSearchParams();
   const router = useRouter();
   const q = params.get('q') ?? '';
@@ -158,5 +159,13 @@ export default function ResultsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-xl px-4 py-6 text-sm text-neutral-400">加载中…</div>}>
+      <ResultsContent />
+    </Suspense>
   );
 }

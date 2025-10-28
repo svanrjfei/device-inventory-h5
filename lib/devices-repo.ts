@@ -4,9 +4,25 @@ import { rowToDTO } from './mapping';
 import type { DeviceDTO } from './types';
 import { and, desc, eq, like, or, sql } from 'drizzle-orm';
 
+function isTransientDbError(err: any) {
+  const code = err?.code || err?.cause?.code;
+  return code === 'ECONNRESET' || code === 'PROTOCOL_CONNECTION_LOST' || code === 'ER_SERVER_SHUTDOWN' || code === 'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR';
+}
+
+async function withRetry<T>(fn: () => Promise<T>, retries = 1): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (retries > 0 && isTransientDbError(e)) {
+      return await fn();
+    }
+    throw e;
+  }
+}
+
 export async function getDeviceById(id: number): Promise<DeviceDTO | null> {
   if (!Number.isFinite(id)) return null;
-  const rows = await db.select().from(devices).where(eq(devices.id, Number(id))).limit(1);
+  const rows = await withRetry<any[]>(() => db.select().from(devices).where(eq(devices.id, Number(id))));
   if (!rows.length) return null;
   return rowToDTO(rows[0]);
 }
@@ -153,7 +169,9 @@ export async function distinctLocations(params: { search?: string; offset?: numb
     .where(sql`(${devices.location} IS NULL)`);
 
   return {
-    items: rows.map((r) => r.location).filter((v): v is string => v != null),
+    items: rows
+      .map((r: any) => r.location as string | null)
+      .filter((v: string | null): v is string => v != null),
     total: totalRows[0]?.count ?? 0,
     hasNull: (nullRows[0]?.c ?? 0) > 0,
   };
