@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useParams, useRouter } from "next/navigation";
 import { devicesApi } from "@/lib/api";
 import { formatMoney, formatDate } from "@/lib/format";
@@ -15,6 +15,8 @@ export default function DeviceDetailPage() {
   const [d, setD] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
   const [backHref, setBackHref] = useState<string>("/ledger");
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [restoreLocation, setRestoreLocation] = useState("");
 
   useEffect(() => {
     setMounted(true);
@@ -36,6 +38,23 @@ export default function DeviceDetailPage() {
         <PageHeader title="设备信息" backHref={backHref} />
         <div className="mx-4 text-sm text-neutral-400">加载中…</div>
         <div className="pb-28" />
+        {restoreOpen && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setRestoreOpen(false)} />
+            <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-lg p-4 mx-auto">
+              <div className="mb-2 text-base font-medium">确认存放位置</div>
+              <div className="text-xs text-neutral-500 mb-3">
+                {d?.name} <span className="text-neutral-400">({d?.code})</span>
+              </div>
+              <label className="block text-sm text-neutral-700 mb-1">存放位置</label>
+              <input value={restoreLocation} onChange={(e) => setRestoreLocation(e.target.value)} placeholder="请输入设备当前的存放位置" className="w-full rounded-md border px-3 py-2 text-sm" />
+              <div className="mt-4 flex justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setRestoreOpen(false)}>取消</Button>
+                <Button size="sm" onClick={() => { if (!d) return; toast.promise(devicesApi.patch(d.id, { missing: false, location: restoreLocation || null }).then((res) => { setD(res); setRestoreOpen(false); return res; }), { loading: '更新中', success: '已设为非缺失', error: '操作失败' }); }}>应用</Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
 
@@ -48,17 +67,16 @@ export default function DeviceDetailPage() {
     );
 
   function toggleMissing() {
-    toast.promise(
-      devicesApi.patch(d.id, { missing: !d.missing }).then((res) => {
-        setD(res);
-        return res;
-      }),
-      {
-        loading: d.missing ? "设置为非缺失…" : "设置为缺失…",
-        success: d.missing ? "已设为非缺失" : "已设为缺失",
-        error: "更新失败",
-      }
-    );
+  if (!d) return;
+  if (d.missing) {
+    setRestoreLocation(d.location ?? "");
+    setRestoreOpen(true);
+    return;
+  }
+  toast.promise(
+    devicesApi.patch(d.id, { missing: true }).then((res) => { setD(res); return res; }),
+    { loading: "设置为缺失中", success: "已设置为缺失", error: "操作失败" }
+  );
   }
 
   return (
@@ -71,7 +89,7 @@ export default function DeviceDetailPage() {
           <>
             <Button variant="outline" size="sm" onClick={toggleMissing}>
               <AlertTriangle size={16} className={d.missing ? 'text-red-500' : 'text-neutral-400'} />
-              <span className="ml-1">{d.missing ? '设为非缺失' : '设为缺失'}</span>
+              <span className="ml-1">{d.missing ? "设为非缺失" : "设为缺失"}</span>
             </Button>
             <a href={`/devices/${d.id}/edit`}>
               <Button size="sm">编辑</Button>
