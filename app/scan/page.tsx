@@ -3,59 +3,47 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { devicesApi } from "@/lib/api";
 import { toast } from "sonner";
-import { BrowserMultiFormatReader, DecodeHintType, NotFoundException, BarcodeFormat } from "@zxing/library";
+import { readBarcodesFromImageData, readBarcodesFromImageFile, defaultReaderOptions, prepareZXingModule, linearBarcodeFormats } from "zxing-wasm/reader";
 import { PageHeader } from "@/components/ui/header";
 
 type ScanMode = "auto" | "1d" | "2d";
 
-const FORMATS_2D = [
-  BarcodeFormat.QR_CODE,
-  BarcodeFormat.AZTEC,
-  BarcodeFormat.DATA_MATRIX,
-  BarcodeFormat.PDF_417,
-];
-const FORMATS_1D = [
-  BarcodeFormat.EAN_13,
-  BarcodeFormat.EAN_8,
-  BarcodeFormat.UPC_A,
-  BarcodeFormat.UPC_E,
-  BarcodeFormat.CODE_128,
-  BarcodeFormat.CODE_39,
-  BarcodeFormat.CODE_93,
-  BarcodeFormat.ITF,
-  BarcodeFormat.CODABAR,
-];
+// 二维码默认仅启用 QRCode 以提升识别速度
+const FORMATS_2D = ["QRCode"] as const;
+const FORMATS_1D = linearBarcodeFormats as string[];
 
-function getFormats(mode: ScanMode) {
-  if (mode === "1d") return FORMATS_1D;
-  if (mode === "2d") return FORMATS_2D;
+function getFormats(mode: ScanMode): string[] {
+  if (mode === "1d") return FORMATS_1D as string[];
+  if (mode === "2d") return [...FORMATS_2D];
   return [...FORMATS_2D, ...FORMATS_1D];
 }
 
-function buildHints(mode: ScanMode) {
-  const hints = new Map();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, getFormats(mode));
-  hints.set(DecodeHintType.TRY_HARDER, true);
-  try { hints.set(((DecodeHintType as any).ALSO_INVERTED as any), true as any); } catch {}
-  try { hints.set(((DecodeHintType as any).ASSUME_GS1 as any), true as any); } catch {}
-  return hints;
+function buildOptions(mode: ScanMode) {
+  const opts: any = { ...defaultReaderOptions };
+  opts.formats = getFormats(mode);
+  opts.tryHarder = true;
+  opts.tryRotate = true;
+  opts.tryInvert = true;
+  opts.maxNumberOfSymbols = 1;
+  opts.downscaleFactor = 3;
+  return opts;
 }
 
 export default function ScanPage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const scanningRef = useRef<{ stop: boolean } | null>(null);
   const [active, setActive] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
-  const [mode, setMode] = useState<ScanMode>("auto");
+  const [mode, setMode] = useState<ScanMode>("2d");
   const [torchOn, setTorchOn] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
 
   useEffect(() => {
-    return () => {
-      stopScan();
-    };
+    // 预加载 wasm 减少首次识别延迟
+    try { prepareZXingModule({ fireImmediately: true } as any); } catch {}
+    return () => { stopScan(); };
   }, []);
 
   function onDetected(text: string) {
@@ -105,35 +93,27 @@ export default function ScanPage() {
       return;
     }
 
-    const reader = new BrowserMultiFormatReader(buildHints(mode), 300);
-    readerRef.current = reader;
-
     try {
       const constraintsList: MediaStreamConstraints[] = [
-        { video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
-        { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
-        { video: { facingMode: { ideal: "environment" }, width: { ideal: 960 }, height: { ideal: 540 } }, audio: false },
+        { video: { facingMode: { exact: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+        { video: { facingMode: { exact: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false },
+        { video: { facingMode: { exact: "environment" } }, audio: false },
         { video: { facingMode: { ideal: "environment" } }, audio: false },
       ];
 
       let started = false;
       for (const cs of constraintsList) {
         try {
-          await reader.decodeFromConstraints(
-            cs,
-            video,
-            (result, err) => {
-              if (result) {
-                onDetected(result.getText());
-              } else if (err && !(err instanceof NotFoundException)) {
-                setMsg(String(err));
-              }
-            }
-          );
-          started = true;
-          break;
+          const stream = await navigator.mediaDevices.getUserMedia(cs);
+          video.srcObject = stream;
+          await new Promise<void>((resolve) => {
+            video.onloadedmetadata = () => {
+              video.play().then(() => resolve()).catch(() => resolve());
+            };
+          });
+          started = true; break;
         } catch {
-          try { reader.reset(); } catch {}
+          // try next
         }
       }
       if (!started) throw new Error("无法启动摄像头");
@@ -149,6 +129,30 @@ export default function ScanPage() {
           await (track as any).applyConstraints({ advanced: [{ torch: true }] });
         }
       } catch {}
+
+      // 启动扫描循环
+      const state = { stop: false }; scanningRef.current = state;
+      const opts: any = buildOptions(mode);
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      const loop = async () => {
+        if (state.stop) return;
+        try {
+          const w = (video as HTMLVideoElement).videoWidth | 0; const h = (video as HTMLVideoElement).videoHeight | 0;
+          if (w && h && ctx) {
+            canvas.width = w; canvas.height = h;
+            ctx.drawImage(video, 0, 0, w, h);
+            const imageData = ctx.getImageData(0, 0, w, h);
+            const results = await readBarcodesFromImageData(imageData as any, opts);
+            if (results && results.length) {
+              const text = (results[0] as any).text || "";
+              if (text) { onDetected(text); return; }
+            }
+          }
+        } catch {}
+        setTimeout(loop, 120);
+      };
+      loop();
     } catch (e: any) {
       setPermissionError(e?.message || "无法访问摄像头，请检查权限或使用查询页");
       setActive(false);
@@ -156,9 +160,7 @@ export default function ScanPage() {
   }
 
   function stopScan() {
-    try { readerRef.current?.stopContinuousDecode(); } catch {}
-    readerRef.current?.reset();
-    readerRef.current = null;
+    if (scanningRef.current) scanningRef.current.stop = true;
     try {
       const stream = (videoRef.current?.srcObject ?? null) as MediaStream | null;
       stream?.getTracks?.().forEach((t) => t.stop());
@@ -236,15 +238,16 @@ function AlbumFallback({ onDetected }: { onDetected: (text: string) => void }) {
     if (!file) return;
     setBusy(true);
     setError(null);
-    const url = URL.createObjectURL(file);
     try {
-      const reader = new BrowserMultiFormatReader(buildHints("auto"));
-      const result = await reader.decodeFromImageUrl(url);
-      if (result?.getText) onDetected(result.getText());
+      const results = await readBarcodesFromImageFile(file, (buildOptions("auto") as any));
+      if (results && results.length) {
+        onDetected((results[0] as any).text || "");
+      } else {
+        setError("未识别到有效条码/二维码");
+      }
     } catch (err: any) {
       setError(err?.message || "识别失败，可尝试更清晰/更大条码图片");
     } finally {
-      URL.revokeObjectURL(url);
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -268,4 +271,3 @@ function AlbumFallback({ onDetected }: { onDetected: (text: string) => void }) {
     </div>
   );
 }
-
