@@ -13,21 +13,19 @@ export default function DeviceEditPage() {
   const router = useRouter();
   const id = Number(params.id);
   const [form, setForm] = useState<DeviceDTO | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    devicesApi.get(id).then(setForm).catch(() => setForm(null));
+    setLoading(true);
+    devicesApi
+      .get(id)
+      .then(setForm)
+      .catch(() => setForm(null))
+      .finally(() => setLoading(false));
   }, [id]);
 
-  if (!form)
-    return (
-      <div className="mx-auto max-w-xl px-0">
-        <PageHeader title="编辑设备信息" backHref="/ledger" />
-        <div className="mx-4 text-sm text-gray-600">未找到设备</div>
-      </div>
-    );
-
   function onChange<K extends keyof DeviceDTO>(key: K, val: DeviceDTO[K]) {
-    setForm((prev) => (prev ? { ...prev, [key]: val } as DeviceDTO : prev));
+    setForm((prev) => (prev ? ({ ...prev, [key]: val } as DeviceDTO) : prev));
   }
 
   function save() {
@@ -56,11 +54,29 @@ export default function DeviceEditPage() {
       devicesApi.patch(form.id, patch).then(() => {
         router.push(`/devices/${form.id}`);
       }),
-      {
-        loading: "保存中…",
-        success: "保存成功",
-        error: "保存失败",
-      }
+      { loading: "保存中", success: "保存成功", error: "保存失败" }
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-xl px-0">
+        <PageHeader title="编辑设备信息" backHref="/ledger" />
+        <div className="mx-4 space-y-3 animate-pulse">
+          <div className="h-6 w-48 bg-gray-200 rounded" />
+          <div className="h-24 bg-gray-200 rounded" />
+          <div className="h-24 bg-gray-200 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!form) {
+    return (
+      <div className="mx-auto max-w-xl px-0">
+        <PageHeader title="编辑设备信息" backHref="/ledger" />
+        <div className="mx-4 mt-4 text-sm text-gray-600">未找到设备</div>
+      </div>
     );
   }
 
@@ -68,9 +84,8 @@ export default function DeviceEditPage() {
     <div className="mx-auto max-w-xl px-0">
       <PageHeader title="编辑设备信息" backHref={`/devices/${form.id}`} subtitle={<span className="text-xs">{form.name} · {form.code}</span>} />
       <div className="mx-4 space-y-4">
-        {/* 基础信息 */}
         <Card>
-          <CardHeader className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600">基础信息</CardHeader>
+          <CardHeader className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600">基本信息</CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <label className="col-span-2">名称
@@ -85,7 +100,7 @@ export default function DeviceEditPage() {
               <label>状态
                 <select value={form.status} onChange={(e)=>onChange('status', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm">
                   <option value="在用">在用</option>
-                  <option value="闲置">闲置</option>
+                  <option value="停用">停用</option>
                   <option value="报废">报废</option>
                 </select>
               </label>
@@ -104,7 +119,7 @@ export default function DeviceEditPage() {
               <label className="col-span-2">位置
                 <input value={form.location ?? ''} onChange={(e)=>onChange('location', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
               </label>
-              <label>保管
+              <label>保管人
                 <input value={form.keeper ?? ''} onChange={(e)=>onChange('keeper', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
               </label>
               <label>入库日期
@@ -117,15 +132,14 @@ export default function DeviceEditPage() {
           </CardContent>
         </Card>
 
-        {/* 财务信息 */}
         <Card>
-          <CardHeader className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600">财务信息</CardHeader>
+          <CardHeader className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600">资产信息</CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <label>单价
                 <input value={form.unitPrice} onChange={(e)=>onChange('unitPrice', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
               </label>
-              <label>金额
+              <label>总价
                 <input value={form.totalPrice} onChange={(e)=>onChange('totalPrice', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
               </label>
               <label>部门
@@ -135,15 +149,14 @@ export default function DeviceEditPage() {
           </CardContent>
         </Card>
 
-        {/* 其他信息 */}
         <Card>
-          <CardHeader className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600">其他信息</CardHeader>
+          <CardHeader className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600">发票/经费</CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <label>出厂
+              <label>出厂号
                 <input value={form.factoryNumber ?? ''} onChange={(e)=>onChange('factoryNumber', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
               </label>
-              <label>发票
+              <label>发票号
                 <input value={form.invoiceNumber ?? ''} onChange={(e)=>onChange('invoiceNumber', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
               </label>
               <label>经费编号
@@ -167,3 +180,4 @@ export default function DeviceEditPage() {
     </div>
   );
 }
+

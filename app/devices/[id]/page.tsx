@@ -12,13 +12,13 @@ export default function DeviceDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const [d, setD] = useState<any>(null);
-  const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [backHref, setBackHref] = useState<string>("/ledger");
   const [restoreOpen, setRestoreOpen] = useState(false);
   const [restoreLocation, setRestoreLocation] = useState("");
 
   useEffect(() => {
-    setMounted(true);
+    setLoading(true);
     try {
       const src = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("src") : null;
       if (src === "scan") setBackHref("/scan");
@@ -29,25 +29,32 @@ export default function DeviceDetailPage() {
       .catch(() => {
         setD(null);
         toast.error("加载失败");
-      });
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
-  if (!mounted)
+  if (loading) {
     return (
       <div className="mx-auto max-w-xl px-0">
         <PageHeader title="设备信息" backHref={backHref} />
-        <div className="mx-4 text-sm text-neutral-400">加载中…</div>
+        <div className="mx-4 space-y-3 animate-pulse">
+          <div className="h-6 w-40 bg-gray-200 rounded" />
+          <div className="h-24 bg-gray-200 rounded" />
+          <div className="h-24 bg-gray-200 rounded" />
+        </div>
         <div className="pb-28" />
       </div>
     );
+  }
 
-  if (!d)
+  if (!d) {
     return (
       <div className="mx-auto max-w-xl px-0">
         <PageHeader title="设备信息" backHref={backHref} />
-        <div className="mx-4 text-sm text-gray-600">未找到设备</div>
+        <div className="mx-4 mt-4 text-sm text-gray-600">未找到设备</div>
       </div>
     );
+  }
 
   function toggleMissing() {
     if (!d) return;
@@ -156,4 +163,3 @@ export default function DeviceDetailPage() {
     </div>
   );
 }
-
