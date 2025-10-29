@@ -229,7 +229,8 @@ export default function ScanPage() {
 }
 
 function AlbumFallback({ onDetected }: { onDetected: (text: string) => void }) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const albumInputRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -249,25 +250,36 @@ function AlbumFallback({ onDetected }: { onDetected: (text: string) => void }) {
       setError(err?.message || "识别失败，可尝试更清晰/更大条码图片");
     } finally {
       setBusy(false);
-      if (inputRef.current) inputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+      if (albumInputRef.current) albumInputRef.current.value = "";
     }
   }
 
   return (
     <div className="mt-3">
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={onPick} className="hidden" />
+      <input ref={albumInputRef} type="file" accept="image/*" onChange={onPick} className="hidden" />
       <div className="flex items-center gap-2">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          capture="environment"
-          onChange={onPick}
-          className="block w-full text-sm file:mr-3 file:rounded-md file:border file:bg-gray-50 file:px-3 file:py-1.5 file:text-sm hover:file:bg-gray-100"
-        />
-        {busy && <span className="text-xs text-gray-500">识别中…</span>}
+        <button
+          type="button"
+          onClick={() => cameraInputRef.current?.click()}
+          className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+          disabled={busy}
+        >
+          拍照
+        </button>
+        <button
+          type="button"
+          onClick={() => albumInputRef.current?.click()}
+          className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50"
+          disabled={busy}
+        >
+          从相册选择
+        </button>
+        {busy && <span className="ml-2 text-xs text-gray-500">识别中…</span>}
       </div>
       {error && <p className="mt-2 text-xs text-amber-600">{error}</p>}
-      <p className="mt-2 text-xs text-gray-500">也可拍照/选择包含设备码的图片进行识别</p>
+      <p className="mt-2 text-xs text-gray-500">也可拍照或从相册选择包含设备码的图片进行识别</p>
     </div>
   );
 }
