@@ -106,40 +106,39 @@ export default function DeviceDetailPage() {
         <div className="rounded-lg border bg-white shadow-sm">
           <div className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white flex items-center justify-between">
             <div className="text-sm text-neutral-600 flex items-center gap-2">
-              <BadgeInfo size={16} className="text-neutral-400" /> 基本信息
+              <BadgeInfo size={16} className="text-neutral-400" /> {"\u57FA\u672C\u4FE1\u606F"}
             </div>
             <span className="text-[11px] rounded-full px-2 py-0.5 border border-neutral-300 text-neutral-700 bg-neutral-50">{d.status}</span>
           </div>
           <div className="px-4 py-3">
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-              <div className="flex items-center text-neutral-700"><Tag size={16} className="mr-1.5 text-neutral-400" />类型：{d.deviceType}</div>
-              <div className="flex items-center text-neutral-700">单位：{d.unit ?? '无'}</div>
-              <div className="flex items-center text-neutral-700"><DollarSign size={16} className="mr-1.5 text-neutral-400" />单价：{formatMoney(d.unitPrice)}</div>
-              <div className="flex items-center text-neutral-700">数量：{d.quantity ?? '无'}</div>
-              <div className="flex items-center text-neutral-700">总价：{formatMoney(d.totalPrice)}</div>
-              <div className="flex items-center text-neutral-700">部门：{d.department ?? '无'}</div>
-              <div className="col-span-2 flex items-center text-neutral-700"><MapPin size={16} className="mr-1.5 text-neutral-400" />位置：{d.location ?? '无'}</div>
-              <div className="flex items-center text-neutral-700"><User size={16} className="mr-1.5 text-neutral-400" />保管人：{d.keeper ?? '无'}</div>
-              <div className="flex items-center text-neutral-700"><Calendar size={16} className="mr-1.5 text-neutral-400" />入库：{formatDate(d.storageAt)}</div>
-              <div className="flex items-center text-neutral-700">用途：{d.usage ?? '无'}</div>
-              <div className="flex items-center text-neutral-700">出厂编号：{d.factoryNumber ?? '无'}</div>
-              <div className="flex items-center text-neutral-700">发票号：{d.invoiceNumber ?? '无'}</div>
-              <div className="flex items-center text-neutral-700">经费编号：{d.fundingCode ?? '无'}</div>
-              <div className="flex items-center text-neutral-700">经费来源：{d.funding ?? '无'}</div>
-              <div className="col-span-2 text-neutral-700">备注：{d.note ?? '无'}</div>
+              <div className="flex items-center text-neutral-700"><Tag size={16} className="mr-1.5 text-neutral-400" />{"\u7C7B\u578B\uFF1A"}{d.deviceType}</div>
+              <div className="flex items-center text-neutral-700">{"\u5355\u4F4D\uFF1A"}{d.unit ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700"><DollarSign size={16} className="mr-1.5 text-neutral-400" />{"\u5355\u4EF7\uFF1A"}{formatMoney(d.unitPrice)}</div>
+              <div className="flex items-center text-neutral-700">{"\u6570\u91CF\uFF1A"}{d.quantity ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700">{"\u603B\u4EF7\uFF1A"}{formatMoney(d.totalPrice)}</div>
+              <div className="flex items-center text-neutral-700">{"\u90E8\u95E8\uFF1A"}{d.department ?? "\u65E0"}</div>
+              <div className="col-span-2 flex items-center text-neutral-700"><MapPin size={16} className="mr-1.5 text-neutral-400" />{"\u4F4D\u7F6E\uFF1A"}{d.location ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700"><User size={16} className="mr-1.5 text-neutral-400" />{"\u4FDD\u7BA1\u4EBA\uFF1A"}{d.keeper ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700"><Calendar size={16} className="mr-1.5 text-neutral-400" />{"\u5165\u5E93\uFF1A"}{formatDate(d.storageAt)}</div>
+              <div className="flex items-center text-neutral-700">{"\u7528\u9014\uFF1A"}{d.usage ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700">{"\u51FA\u5382\u7F16\u53F7\uFF1A"}{d.factoryNumber ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700">{"\u53D1\u7968\u53F7\uFF1A"}{d.invoiceNumber ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700">{"\u7ECF\u8D39\u7F16\u53F7\uFF1A"}{d.fundingCode ?? "\u65E0"}</div>
+              <div className="flex items-center text-neutral-700">{"\u7ECF\u8D39\u6765\u6E90\uFF1A"}{d.funding ?? "\u65E0"}</div>
+              <div className="col-span-2 text-neutral-700">{"\u5907\u6CE8\uFF1A"}{d.note ?? "\u65E0"}</div>
             </div>
           </div>
         </div>
 
         <div className="rounded-lg border bg-white shadow-sm">
           <div className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600 flex items-center gap-2">
-            <BadgeInfo size={16} className="text-neutral-400" /> 记录
+            <BadgeInfo size={16} className="text-neutral-400" /> {"\u8BB0\u5F55"}
           </div>
           <div className="px-4 py-3">
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-neutral-700">
-              <div>创建于：{formatDate(d.createdAt)}</div>
-              <div>更新于：{formatDate(d.updatedAt)}</div>
-            </div>
+              <div>{"\u521B\u5EFA\u4E8E\uFF1A"}{formatDate(d.createdAt)}</div>
+              <div>{"\u66F4\u65B0\u4E8E\uFF1A"}{formatDate(d.updatedAt)}</div>
           </div>
         </div>
 
@@ -149,11 +148,11 @@ export default function DeviceDetailPage() {
           <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => setRestoreOpen(false)} />
             <div className="relative w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-white shadow-lg p-4 mx-auto">
-              <div className="mb-2 text-base font-medium">确认恢复位置</div>
+              <div className="mb-2 text-base font-medium">{"\u786E\u8BA4\u6062\u590D\u4F4D\u7F6E"}</div>
               <div className="text-xs text-neutral-500 mb-3">
                 {d?.name} <span className="text-neutral-400">({d?.code})</span>
               </div>
-              <label className="block text-sm text-neutral-700 mb-1">恢复位置</label>
+              <label className="block text-sm text-neutral-700 mb-1">{"\u6062\u590D\u4F4D\u7F6E"}</label>
               <input
                 value={restoreLocation}
                 onChange={(e) => setRestoreLocation(e.target.value)}
@@ -177,4 +176,5 @@ export default function DeviceDetailPage() {
     </div>
   );
 }
+
 

@@ -1,6 +1,6 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import type { DeviceDTO } from "@/lib/types";
 import { devicesApi } from "@/lib/api";
 import { PageHeader } from "@/components/ui/header";
@@ -11,6 +11,14 @@ import { toast } from "sonner";
 type CreateForm = Partial<DeviceDTO> & { code: string; name: string };
 
 export default function DeviceCreatePage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-xl px-4 py-6 text-sm text-neutral-400">加载中…</div>}>
+      <DeviceCreateForm />
+    </Suspense>
+  );
+}
+
+function DeviceCreateForm() {
   const router = useRouter();
   const sp = useSearchParams();
   const presetCode = sp?.get("code") || "";
