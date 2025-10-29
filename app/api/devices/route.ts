@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { listDevices } from '@/lib/devices-repo';
+import { listDevices, createDevice } from '@/lib/devices-repo';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,4 +20,15 @@ export async function GET(req: NextRequest) {
     limit: Math.min(Number(searchParams.get('limit') ?? '20') || 20, 100),
   });
   return Response.json(res);
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const created = await createDevice(body);
+    return Response.json(created, { status: 201 });
+  } catch (e: any) {
+    const msg = e?.message || 'CreateFailed';
+    return new Response(JSON.stringify({ error: 'BadRequest', message: msg }), { status: 400 });
+  }
 }

@@ -1,36 +1,44 @@
 "use client";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { DeviceDTO } from "@/lib/types";
 import { devicesApi } from "@/lib/api";
-import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/header";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export default function DeviceEditPage() {
-  const params = useParams<{ id: string }>();
+type CreateForm = Partial<DeviceDTO> & { code: string; name: string };
+
+export default function DeviceCreatePage() {
   const router = useRouter();
-  const id = Number(params.id);
-  const [form, setForm] = useState<DeviceDTO | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const sp = useSearchParams();
+  const presetCode = sp?.get("code") || "";
+  const backHref = sp?.get("src") === "scan" ? "/scan" : "/ledger";
+
+  const [form, setForm] = useState<CreateForm>({
+    code: presetCode,
+    name: "",
+    deviceType: "资产",
+    status: "在用",
+    unit: "台",
+    quantity: 1,
+    unitPrice: "0.00",
+    totalPrice: "0.00",
+  });
 
   useEffect(() => {
-    setLoading(true);
-    devicesApi
-      .get(id)
-      .then(setForm)
-      .catch(() => setForm(null))
-      .finally(() => setLoading(false));
-  }, [id]);
+    if (presetCode) setForm((f) => ({ ...f, code: presetCode }));
+  }, [presetCode]);
 
-  function onChange<K extends keyof DeviceDTO>(key: K, val: DeviceDTO[K]) {
-    setForm((prev) => (prev ? ({ ...prev, [key]: val } as DeviceDTO) : prev));
+  function onChange<K extends keyof CreateForm>(key: K, val: CreateForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: val }));
     setErrors((prev) => ({ ...prev, [key as string]: "" }));
   }
 
-  function validate(values: DeviceDTO) {
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  function validate(values: CreateForm) {
     const errs: Record<string, string> = {};
     if (!values.name || !values.name.trim()) errs.name = "请填写名称";
     if (!values.code || !values.code.trim()) errs.code = "请填写编码";
@@ -38,76 +46,41 @@ export default function DeviceEditPage() {
   }
 
   function save() {
-    if (!form) return;
     const errs = validate(form);
     if (Object.keys(errs).length) { setErrors(errs); toast.error("请完善必填项"); return; }
-    const patch: Partial<DeviceDTO> = {
-      name: form.name,
-      model: form.model,
-      status: form.status,
-      missing: form.missing,
-      unit: form.unit,
-      unitPrice: form.unitPrice,
-      totalPrice: form.totalPrice,
-      quantity: form.quantity,
-      department: form.department,
-      location: form.location,
-      keeper: form.keeper,
-      storageAt: form.storageAt,
-      usage: form.usage,
-      factoryNumber: form.factoryNumber,
-      invoiceNumber: form.invoiceNumber,
-      fundingCode: form.fundingCode,
-      funding: form.funding,
-      note: form.note,
+    const payload: Partial<DeviceDTO> = {
+      code: form.code.trim(),
+      name: form.name.trim(),
+      deviceType: form.deviceType ?? "资产",
+      model: form.model ?? null,
+      unit: form.unit ?? "台",
+      unitPrice: form.unitPrice ?? "0.00",
+      totalPrice: form.totalPrice ?? "0.00",
+      quantity: form.quantity ?? 1,
+      department: form.department ?? null,
+      location: form.location ?? null,
+      keeper: form.keeper ?? null,
+      storageAt: form.storageAt ?? null,
+      usage: form.usage ?? null,
+      factoryNumber: form.factoryNumber ?? null,
+      invoiceNumber: form.invoiceNumber ?? null,
+      fundingCode: form.fundingCode ?? null,
+      funding: form.funding ?? null,
+      note: form.note ?? null,
+      status: form.status ?? "在用",
+      missing: Boolean(form.missing) || false,
     };
     toast.promise(
-      devicesApi.patch(form.id, patch).then(() => {
-        router.push(`/devices/${form.id}`);
+      devicesApi.create(payload).then((created) => {
+        router.replace(`/devices/${created.id}`);
       }),
-      { loading: "保存中…", success: "保存成功", error: "保存失败" }
-    );
-  }
-
-  function doDelete() {
-    if (!form) return;
-    try {
-      const ok = window.confirm(`确定删除设备“${form.name}(${form.code})”？此操作不可撤销。`);
-      if (!ok) return;
-    } catch {}
-    toast.promise(
-      devicesApi.remove(form.id).then(() => {
-        router.push('/ledger');
-      }),
-      { loading: '删除中…', success: '已删除', error: '删除失败' }
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="mx-auto max-w-xl px-0">
-        <PageHeader title="编辑设备信息" backHref="/ledger" />
-        <div className="mx-4 space-y-3 animate-pulse">
-          <div className="h-6 w-48 bg-gray-200 rounded" />
-          <div className="h-24 bg-gray-200 rounded" />
-          <div className="h-24 bg-gray-200 rounded" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!form) {
-    return (
-      <div className="mx-auto max-w-xl px-0">
-        <PageHeader title="编辑设备信息" backHref="/ledger" />
-        <div className="mx-4 mt-4 text-sm text-gray-600">未找到设备</div>
-      </div>
+      { loading: "保存中…", success: "新增成功", error: "新增失败" }
     );
   }
 
   return (
     <div className="mx-auto max-w-xl px-0">
-      <PageHeader title="编辑设备信息" backHref={`/devices/${form.id}`} subtitle={<span className="text-xs">{form.name} · {form.code}</span>} />
+      <PageHeader title="新增设备台账" backHref={backHref} />
       <div className="mx-4 space-y-4">
         <Card>
           <CardHeader className="px-4 py-3 border-b bg-gradient-to-r from-neutral-50 to-white text-sm text-neutral-600">基本信息</CardHeader>
@@ -121,11 +94,11 @@ export default function DeviceEditPage() {
                 />
                 {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name}</p>}
               </label>
-              <label>编码（只读）<span className="ml-0.5 text-red-600">*</span>
+              <label>编码<span className="ml-0.5 text-red-600">*</span>
                 <input
                   value={form.code}
-                  readOnly
-                  className={`mt-1 w-full h-10 rounded-md border bg-gray-50 px-3 text-sm ${errors.code ? 'border-red-500' : ''}`}
+                  onChange={(e)=>onChange('code', e.target.value)}
+                  className={`mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 ${errors.code ? 'border-red-500 focus:ring-red-500' : 'focus:ring-black/20'}`}
                 />
                 {errors.code && <p className="mt-1 text-xs text-red-600">{errors.code}</p>}
               </label>
@@ -133,23 +106,17 @@ export default function DeviceEditPage() {
                 <input value={form.model ?? ''} onChange={(e)=>onChange('model', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
               </label>
               <label>状态
-                <select value={form.status} onChange={(e)=>onChange('status', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm">
+                <select value={form.status ?? '在用'} onChange={(e)=>onChange('status', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm">
                   <option value="在用">在用</option>
                   <option value="停用">停用</option>
                   <option value="报废">报废</option>
                 </select>
               </label>
-              <label>是否缺失
-                <select value={form.missing ? '1':'0'} onChange={(e)=>onChange('missing', e.target.value==='1')} className="mt-1 w-full h-10 rounded-md border px-3 text-sm">
-                  <option value="0">否</option>
-                  <option value="1">是</option>
-                </select>
-              </label>
               <label>单位
-                <input value={form.unit ?? ''} onChange={(e)=>onChange('unit', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
+                <input value={form.unit ?? '台'} onChange={(e)=>onChange('unit', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
               </label>
               <label>数量
-                <input value={form.quantity ?? 0} onChange={(e)=>onChange('quantity', Number(e.target.value)||0)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
+                <input value={form.quantity ?? 1} onChange={(e)=>onChange('quantity', Number(e.target.value)||0)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
               </label>
               <label className="col-span-2">位置
                 <input value={form.location ?? ''} onChange={(e)=>onChange('location', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm focus:outline-none focus:ring-2 focus:ring-black/20" />
@@ -172,10 +139,10 @@ export default function DeviceEditPage() {
           <CardContent>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <label>单价
-                <input value={form.unitPrice} onChange={(e)=>onChange('unitPrice', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
+                <input value={form.unitPrice ?? ''} onChange={(e)=>onChange('unitPrice', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
               </label>
               <label>总价
-                <input value={form.totalPrice} onChange={(e)=>onChange('totalPrice', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
+                <input value={form.totalPrice ?? ''} onChange={(e)=>onChange('totalPrice', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
               </label>
               <label>归属部门
                 <input value={form.department ?? ''} onChange={(e)=>onChange('department', e.target.value)} className="mt-1 w-full h-10 rounded-md border px-3 text-sm" />
@@ -207,15 +174,11 @@ export default function DeviceEditPage() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-between gap-3">
-          <Button variant="outline" size="sm" onClick={doDelete} className="text-red-600 border-red-300 hover:bg-red-50">删除</Button>
-          <div className="flex gap-3">
-            <Button variant="outline" size="sm" onClick={() => router.push(`/devices/${form.id}`)}>取消</Button>
-            <Button size="sm" onClick={save}>保存</Button>
-          </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" size="sm" onClick={() => router.push(backHref)}>取消</Button>
+          <Button size="sm" onClick={save}>保存</Button>
         </div>
       </div>
     </div>
   );
 }
-

@@ -176,3 +176,57 @@ export async function distinctLocations(params: { search?: string; offset?: numb
     hasNull: (nullRows[0]?.c ?? 0) > 0,
   };
 }
+
+export async function createDevice(body: Partial<DeviceDTO>): Promise<DeviceDTO> {
+  const now = new Date();
+  const insert: any = {
+    code: body.code?.trim?.() || '',
+    name: body.name?.trim?.() || '',
+    deviceType: body.deviceType?.trim?.() || '资产',
+    model: body.model ?? null,
+    unit: body.unit ?? '台',
+    unitPrice: body.unitPrice ?? '0.00',
+    totalPrice: body.totalPrice ?? '0.00',
+    quantity: body.quantity ?? 1,
+    department: body.department ?? null,
+    location: body.location ?? null,
+    keeper: body.keeper ?? null,
+    storageAt: body.storageAt ?? null,
+    usage: body.usage ?? null,
+    factoryNumber: body.factoryNumber ?? null,
+    invoiceNumber: body.invoiceNumber ?? null,
+    fundingCode: body.fundingCode ?? null,
+    funding: body.funding ?? null,
+    note: body.note ?? null,
+    status: body.status ?? '在用',
+    missing: body.missing ? 1 : 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  if (!insert.code || !insert.name) {
+    throw new Error('code and name are required');
+  }
+
+  const result: any = await db.insert(devices).values(insert);
+  const id: number | undefined = result?.insertId;
+  if (id && Number.isFinite(id)) {
+    const created = await getDeviceById(Number(id));
+    if (created) return created;
+  }
+  // Fallback: query the latest by code and createdAt
+  const rows = await db
+    .select()
+    .from(devices)
+    .where(eq(devices.code, insert.code))
+    .orderBy(desc(devices.createdAt))
+    .limit(1);
+  if (!rows?.length) throw new Error('failed to create device');
+  return rowToDTO(rows[0]);
+}
+
+export async function deleteDevice(id: number): Promise<boolean> {
+  if (!Number.isFinite(id)) return false;
+  await db.delete(devices).where(eq(devices.id, Number(id)));
+  return true;
+}

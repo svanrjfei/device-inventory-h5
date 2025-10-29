@@ -13,6 +13,13 @@ export const devicesApi = {
     const qs = sp.toString();
     return json<Paged<DeviceDTO>>(`/api/devices${qs ? `?${qs}` : ''}`);
   },
+  create(body: Partial<DeviceDTO>) {
+    return json<DeviceDTO>(`/api/devices`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
   get(id: number) {
     return json<DeviceDTO>(`/api/devices/${id}`);
   },
@@ -21,6 +28,12 @@ export const devicesApi = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+    });
+  },
+  remove(id: number) {
+    return fetch(`/api/devices/${id}`, { method: 'DELETE' }).then((res) => {
+      if (!res.ok && res.status !== 204) throw new Error('DeleteFailed');
+      return;
     });
   },
   locations(params: Record<string, any>) {

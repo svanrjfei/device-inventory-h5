@@ -11,17 +11,18 @@ type HeaderProps = {
   backHref?: string; // navigate to this path instead of history.back
   className?: string;
   actions?: React.ReactNode;
+  stackActions?: boolean; // when true, place actions on a new line under title
 };
 
-export function PageHeader({ title, subtitle, back, backHref, className, actions }: HeaderProps) {
+export function PageHeader({ title, subtitle, back, backHref, className, actions, stackActions = false }: HeaderProps) {
   const router = useRouter();
   return (
     <div className={cn("px-4 pt-6 pb-3", className)}>
-      <div className="flex items-center justify-between">
+      <div className={cn(stackActions ? "flex flex-col items-start gap-1" : "flex items-center justify-between") }>
         <div className="flex items-center gap-2 min-w-0">
           {(back || backHref) && (
             <button
-              aria-label="返回"
+              aria-label="Back"
               onClick={() => router.push(backHref ?? "/")}
               className="inline-flex h-9 w-9 items-center justify-center rounded-md border hover:bg-neutral-50"
             >
@@ -35,8 +36,15 @@ export function PageHeader({ title, subtitle, back, backHref, className, actions
             )}
           </div>
         </div>
-        {actions && <div className="ml-4 flex items-center gap-2">{actions}</div>}
+        {actions && (
+          stackActions ? (
+            <div className="mt-1 flex items-center gap-2">{actions}</div>
+          ) : (
+            <div className="ml-4 flex items-center gap-2">{actions}</div>
+          )
+        )}
       </div>
     </div>
   );
 }
+

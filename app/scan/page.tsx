@@ -69,6 +69,16 @@ export default function ScanPage() {
         router.push(`/devices/${fuzzy.items[0].id}?src=scan`);
       } else if (fuzzy.items.length > 1) {
         router.push(`/search/results?q=${encodeURIComponent(code)}`);
+      } else if (fuzzy.items.length === 0) {
+        try {
+          const yes = window.confirm(`未找到设备“${code}”，是否新增？`);
+          if (yes) {
+            router.push(`/devices/new?code=${encodeURIComponent(code)}&src=scan`);
+            return;
+          }
+        } catch {}
+        setMsg("未找到该设备，可前往查询页或新增。");
+        toast.error("未找到该设备");
       } else {
         setMsg("未找到相关设备，可前往查询页试试");
         toast.error("未找到相关设备");

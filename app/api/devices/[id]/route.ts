@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getDeviceById, patchDevice } from '@/lib/devices-repo';
+import { getDeviceById, patchDevice, deleteDevice } from '@/lib/devices-repo';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,4 +25,14 @@ export async function PATCH(req: NextRequest, ctx: any) {
   const updated = await patchDevice(id, body);
   if (!updated) return new Response(JSON.stringify({ error: 'NotFound' }), { status: 404 });
   return Response.json(updated);
+}
+
+export async function DELETE(_req: NextRequest, ctx: any) {
+  const { id: idStr } = await ctx.params;
+  const id = Number.parseInt(idStr, 10);
+  if (!Number.isFinite(id)) {
+    return new Response(JSON.stringify({ error: 'BadRequest', message: 'invalid id' }), { status: 400 });
+  }
+  await deleteDevice(id);
+  return new Response(null, { status: 204 });
 }

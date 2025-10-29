@@ -127,6 +127,20 @@ export default function LedgerPage() {
     );
   }
 
+  async function removeOne(id: number) {
+    try {
+      const ok = window.confirm('确定删除该设备？此操作不可撤销。');
+      if (!ok) return;
+    } catch {}
+    toast.promise(
+      devicesApi.remove(id).then(() => {
+        setSource((prev) => prev.filter((d) => d.id !== id));
+        setTotal((t) => Math.max(0, t - 1));
+      }),
+      { loading: '删除中…', success: '已删除', error: '删除失败' }
+    );
+  }
+
   function openRestore(dev: DeviceDTO) {
     setRestoreDevice(dev);
     setRestoreLocation(dev.location ?? "");
@@ -205,22 +219,16 @@ export default function LedgerPage() {
 
   return (
     <div className="mx-auto max-w-xl px-0 min-h-[100dvh] flex flex-col">
-      <PageHeader
-        title="设备台账"
-        actions={
-          <>
-            <Button variant="outline" size="sm" onClick={() => setDrawerOpen(true)}>
-              <SlidersHorizontal size={16} />
-              <span className="ml-1">排序与筛选</span>
-            </Button>
-            <Button variant="ghost" size="sm" onClick={reload}>
-              <RefreshCw size={16} className={cn(refreshing && "animate-spin")} /> 刷新
-            </Button>
-          </>
-        }
-        className="shrink-0"
-      />
-
+      <PageHeader title={"\u8BBE\u5907\u53F0\u8D26"} className="shrink-0 pb-1" />
+      <div className="px-4 -mt-1 flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => setDrawerOpen(true)}>
+          <SlidersHorizontal size={16} />
+          <span className="ml-1">{"\u6392\u5E8F\u4E0E\u7B5B\u9009"}</span>
+        </Button>
+        <Button variant="ghost" size="sm" onClick={reload}>
+          <RefreshCw size={16} className={cn(refreshing && "animate-spin")} /> {"\u5237\u65B0"}
+        </Button>
+      </div>
       {/* 顶部抽屉：仅在客户端且打开时渲染，避免 SSR/CSR 数据不一致导致的 hydration 报错 */}
       {mounted && drawerOpen && (
         <div className={cn('fixed inset-x-0 top-0 z-50')}>
@@ -345,6 +353,7 @@ export default function LedgerPage() {
                 d={d}
                 onRestore={openRestore}
                 onMarkMissing={(id) => toggleMissing(id)}
+                onDelete={(id) => removeOne(id)}
               />
             ))}
           </div>
@@ -401,11 +410,17 @@ export default function LedgerPage() {
           </div>
         </div>
       </div>
+      {/* 新增设备浮动按钮 */}
+      <div className="fixed right-4 z-50" style={{ bottom: '128px' }}>
+        <a href="/devices/new">
+          <Button size="lg" className="rounded-full h-12 w-12 p-0 text-xl">+</Button>
+        </a>
+      </div>
     </div>
   );
 }
 
-function DeviceCard({ d, onRestore, onMarkMissing }: { d: DeviceDTO; onRestore: (dev: DeviceDTO) => void; onMarkMissing: (id: number) => void }) {
+function DeviceCard({ d, onRestore, onMarkMissing, onDelete }: { d: DeviceDTO; onRestore: (dev: DeviceDTO) => void; onMarkMissing: (id: number) => void; onDelete: (id: number) => void }) {
   return (
     <Card
       className="overflow-hidden cursor-pointer"
@@ -438,20 +453,34 @@ function DeviceCard({ d, onRestore, onMarkMissing }: { d: DeviceDTO; onRestore: 
           <User size={16} className="mr-1.5 text-neutral-400" />
           <span>{d.keeper ?? '—'}</span>
         </div>
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center">
           <div className="text-sm text-neutral-600 flex items-center gap-1">
             <AlertTriangle size={16} className={cn(d.missing ? 'text-red-500' : 'text-neutral-400')} />
-            缺失：{d.missing ? '是' : '否'}
+            {"\u7F3A\u5931"}: {d.missing ? "\u662F" : "\u5426"}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={(e) => { e.stopPropagation(); d.missing ? onRestore(d) : onMarkMissing(d.id); }}
-          >
-            {d.missing ? '非缺失' : '缺失'}
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); d.missing ? onRestore(d) : onMarkMissing(d.id); }}
+            >
+              {d.missing ? "\u590D\u539F" : "\u7F3A\u5931"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600 border-red-300 hover:bg-red-50"
+              onClick={(e) => { e.stopPropagation(); onDelete(d.id); }}
+            >
+              {"\u5220\u9664"}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
   );
 }
+
+
+
+
