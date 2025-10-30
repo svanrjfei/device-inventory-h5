@@ -44,12 +44,6 @@ export default function LedgerPage() {
   const [locHasNull, setLocHasNull] = useState(false);
   const [locLoading, setLocLoading] = useState(false);
 
-  // pull-to-refresh states
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  const startY = useRef(0);
-  const startScrollTop = useRef(0);
-  const [pull, setPull] = useState(0); // pixels
-  const PULL_THRESHOLD = 60;
   const loadingRef = useRef(false);
   const lastKeyRef = useRef<string>("");
 
@@ -160,35 +154,8 @@ export default function LedgerPage() {
     );
   }
 
-  // 不再使用下滑加载
+  // 不再使用下滑加载与下拉刷新
   function onScroll(_e: React.UIEvent<HTMLDivElement>) {}
-
-  // Pull to refresh handlers
-  function onTouchStart(e: React.TouchEvent<HTMLDivElement>) {
-    const el = scrollRef.current;
-    if (!el) return;
-    startY.current = e.touches[0].clientY;
-    startScrollTop.current = el.scrollTop;
-  }
-  function onTouchMove(e: React.TouchEvent<HTMLDivElement>) {
-    const el = scrollRef.current;
-    if (!el) return;
-    const dy = e.touches[0].clientY - startY.current;
-    const atTop = el.scrollTop <= 0 && startScrollTop.current <= 0;
-    if (dy > 0 && atTop && !refreshing) {
-      e.preventDefault();
-      const dist = Math.min(120, dy * 0.6);
-      setPull(dist);
-    }
-  }
-  function onTouchEnd() {
-    if (pull >= PULL_THRESHOLD) {
-      setPull(0);
-      reload();
-    } else {
-      setPull(0);
-    }
-  }
 
   // When opening drawer, sync drafts from current values
   useEffect(() => {
@@ -327,26 +294,14 @@ export default function LedgerPage() {
         </div>
       )}
 
-      {/* Scroll Container with Pull-to-Refresh: 仅在客户端挂载后渲染，避免 SSR 与 localStorage 差异引起的 hydration */}
+      {/* Scroll Container: 仅在客户端挂载后渲染，避免 SSR 与 localStorage 差异引起的 hydration */}
       {mounted ? (
         <div
-          ref={scrollRef}
           className="mt-3 flex-1 overflow-y-auto px-4 pb-28"
           onScroll={onScroll}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
           style={{ overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 'calc(88px + env(safe-area-inset-bottom))' }}
         >
-          {/* Pull indicator */}
-          <div
-            className="flex items-center justify-center text-xs text-neutral-500"
-            style={{ height: pull, transition: pull === 0 ? 'height 150ms ease-out' : undefined }}
-          >
-            {pull >= PULL_THRESHOLD ? '释放刷新' : pull > 0 ? '下拉刷新' : null}
-          </div>
-
-          <div className="space-y-3" style={{ transform: `translateY(${pull}px)`, transition: pull === 0 ? 'transform 150ms ease-out' : undefined }}>
+          <div className="space-y-3">
             {displayed.map((d) => (
               <DeviceCard
                 key={d.id}
